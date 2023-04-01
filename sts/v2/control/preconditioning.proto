@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package sts.v2.control;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "sts/v2/control/rpc.proto";
+
+message SetPreconditioningScheduleRequest {
+  RpcRequest request = 1;
+  PreconditioningSchedule preconditioning_schedule = 2;
+}
+
+message PreconditioningSchedule {
+  repeated PreconditioningSlice preconditioning_slices = 1;
+}
+
+message PreconditioningSlice {
+  // Unique identifier for this preconditioning slice.
+  // Must be unique within the context of the preconditioning schedule.
+  uint32 id = 1;
+  google.protobuf.Timestamp start = 2;
+  google.protobuf.Duration duration = 3;
+  PreconditioningMode preconditioning_mode = 4;
+  optional uint32 inhibit_soc = 5;
+  optional sint32 inhibit_ambient_temperature_heating = 6;
+  optional sint32 inhibit_ambient_temperature_cooling = 7;
+  optional sint32 cabin_target_temperature = 8;
+}
+
+enum PreconditioningMode {
+  PRECONDITIONING_MODE_UNSPECIFIED = 0;
+  PRECONDITIONING_MODE_AUTO = 2;
+  PRECONDITIONING_MODE_HEATING = 3;
+  PRECONDITIONING_MODE_COOLING = 4;
+}
+
+message SetPreconditioningScheduleResponse {
+  RpcResponse response = 1;
+}
+
+service VehiclePreconditioningService {
+  rpc SetPreconditioningSchedule(SetPreconditioningScheduleRequest) returns (SetPreconditioningScheduleResponse);
+}

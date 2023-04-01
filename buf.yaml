@@ -1,0 +1,11 @@
+version: v1
+breaking:
+  use:
+    - WIRE
+lint:
+  use:
+    - DEFAULT
+    # TODO: uncomment when everything is documented
+    # - COMMENTS
+  except:
+    - PACKAGE_VERSION_SUFFIX

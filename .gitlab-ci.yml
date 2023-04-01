@@ -1,0 +1,172 @@
+stages:
+  - lint
+  - build
+  - deploy
+
+lint:buf:
+  needs: []
+  stage: lint
+  image: debian:11-slim
+  variables:
+    DEB_EXTRA_PACKAGES: ""
+  before_script:
+    - |-
+      # install dependencies
+      apt-get update && apt-get install -y \
+        curl \
+        unzip \
+        $DEB_EXTRA_PACKAGES
+  script:
+    - tools/lint.sh
+
+lint:markdownlint:
+  needs: []
+  stage: lint
+  image:
+    name: davidanson/markdownlint-cli2
+    entrypoint: [""]
+  script:
+    - markdownlint-cli2 '**/*.md'
+
+lint:compatibility:
+  extends: lint:buf
+  stage: lint
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  variables:
+    DEB_EXTRA_PACKAGES: "git"
+    BUF_INPUT_HTTPS_USERNAME: gitlab-ci-token
+    BUF_INPUT_HTTPS_PASSWORD: $CI_JOB_TOKEN
+  script:
+    - tools/buf.sh breaking --against "${CI_PROJECT_URL}.git#branch=${CI_MERGE_REQUEST_TARGET_BRANCH_NAME}"
+
+lint:format:
+  extends: lint:buf
+  stage: lint
+  script:
+    - |-
+      echo "INFO: if this job fails, the Protobuf formatting is incorrect. Run `tools/format.sh` to fix it automatically, or take a look at the diff below."
+      echo ""
+    - tools/buf.sh format -d --exit-code
+
+build:docs:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - when: on_success
+  extends: lint:buf
+  stage: build
+  variables:
+    DEB_EXTRA_PACKAGES: "chromium"
+  script:
+    - tools/docs.sh build
+    - |-
+      project_path_without_root="${CI_PROJECT_PATH#${CI_PROJECT_ROOT_NAMESPACE}/}"
+      echo "JOBS_PAGES_URL=${CI_SERVER_PROTOCOL}://${CI_PROJECT_ROOT_NAMESPACE}.${CI_PAGES_DOMAIN}/-/${project_path_without_root}/-/jobs" >>job.env
+  artifacts:
+    paths:
+      - docs/book/html/
+      - docs/book/pdf/
+    reports:
+      dotenv: job.env
+
+build:protobuf:
+  extends: lint:buf
+  stage: build
+  script:
+    - tools/buf.sh generate
+  artifacts:
+    paths:
+      - gen/
+
+deploy:docs-review:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  stage: deploy
+  variables:
+    GIT_STRATEGY: none
+  needs:
+    - job: build:docs
+      artifacts: true
+  script:
+    - rm -rf public/
+    - mv docs/book/html/ public/
+  artifacts:
+    paths:
+      - public
+  environment:
+    name: review/$CI_COMMIT_REF_NAME
+    url: $JOBS_PAGES_URL/$CI_JOB_ID/artifacts/public/index.html
+    deployment_tier: development
+
+pages:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  stage: deploy
+  needs:
+    - job: build:docs
+      artifacts: true
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - rm -rf public/
+    - mv docs/book/html/ public/
+  artifacts:
+    paths:
+      - public
+  environment:
+    name: default
+    url: $CI_PAGES_URL
+    deployment_tier: production
+
+deploy:gitlab-release:
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d.*$/
+  stage: deploy
+  image: debian:11-slim
+  needs:
+    - job: build:docs
+      artifacts: true
+  variables:
+    PACKAGE_BASE_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/vehicle-connectivity"
+  before_script:
+    - |-
+      # install dependencies
+      apt-get update && apt-get install -y \
+        colorized-logs \
+        curl \
+        unzip
+    - |-
+      # install release-cli
+      curl --location --output /usr/local/bin/release-cli "https://gitlab.com/api/v4/projects/gitlab-org%2Frelease-cli/packages/generic/release-cli/latest/release-cli-linux-amd64"
+      chmod +x /usr/local/bin/release-cli
+      release-cli -v
+
+  script:
+    - |-
+      # determine version
+      version="${CI_COMMIT_TAG##v}"
+      file_name="Vehicle Communication v$version.pdf"
+      pdf_file_url="$PACKAGE_BASE_URL/$version/vehicle-communication.pdf"
+
+      echo "Version: $version"
+      echo "File Name: $file_name"
+      echo "PKG File URL: $pdf_file_url"
+
+    - |-
+      # extract changelog
+      tools/changelog.sh show --version "$version" | ansi2txt >RELEASE_DESCRIPTION
+      cat RELEASE_DESCRIPTION
+
+    - |-
+      # upload PDF as package
+      curl -sSL \
+        --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        --upload-file docs/book/pdf/output.pdf \
+        "$pdf_file_url"
+
+    - |-
+      # create release
+      release-cli create \
+        --name "Version $version" \
+        --description "./RELEASE_DESCRIPTION" \
+        --assets-link='{"name": "'"$file_name"'", "url": "'"$pdf_file_url"'", "filepath": "/vehicle-communication.pdf"}'

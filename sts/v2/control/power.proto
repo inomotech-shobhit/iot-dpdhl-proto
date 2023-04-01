@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package sts.v2.control;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "sts/v2/control/rpc.proto";
+import "sts/v2/types.proto";
+
+message SetChargingPowerRequest {
+  RpcRequest request = 1;
+  optional google.protobuf.Timestamp start = 2;
+  google.protobuf.Timestamp end = 3;
+  sts.v2.ValuePerPhase max_ac_current = 4;
+}
+
+message SetChargingPowerResponse {
+  RpcResponse response = 1;
+  optional sts.v2.ValuePerPhase realized_max_ac_current = 2;
+}
+
+message ChargingSchedule {
+  message PowerSlice {
+    // Unique identifier for this power slice.
+    //
+    // Must be unique within the context of the charging schedule.
+    uint32 id = 1;
+    google.protobuf.Timestamp start = 2;
+    sts.v2.ValuePerPhase max_ac_current = 3;
+  }
+
+  repeated PowerSlice power_slices = 1;
+}
+
+message SetChargingScheduleRequest {
+  RpcRequest request = 1;
+  ChargingSchedule charging_schedule = 2;
+}
+
+message SetChargingScheduleResponse {
+  RpcResponse response = 1;
+  optional ChargingSchedule realized_charging_schedule = 2;
+}
+
+message FallbackChargingSchedule {
+  message FallbackPowerSlice {
+    // Unique identifier for this power slice.
+    //
+    // Must be unique within the context of the charging schedule.
+    uint32 id = 1;
+    google.protobuf.Duration offset_from_midnight = 2;
+    sts.v2.ValuePerPhase max_ac_current = 3;
+  }
+
+  repeated FallbackPowerSlice fallback_power_slices = 1;
+}
+
+message SetFallbackChargingScheduleRequest {
+  RpcRequest request = 1;
+  FallbackChargingSchedule fallback_charging_schedule = 2;
+}
+
+message SetFallbackChargingScheduleResponse {
+  RpcResponse response = 1;
+  optional FallbackChargingSchedule realized_fallback_charging_schedule = 2;
+}
+
+service VehiclePowerService {
+  rpc SetChargingPower(SetChargingPowerRequest) returns (SetChargingPowerResponse);
+
+  rpc SetChargingSchedule(SetChargingScheduleRequest) returns (SetChargingScheduleResponse);
+
+  rpc SetFallbackChargingSchedule(SetFallbackChargingScheduleRequest) returns (SetFallbackChargingScheduleResponse);
+}

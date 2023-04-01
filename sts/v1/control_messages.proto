@@ -1,0 +1,195 @@
+// Messages for controlling the vehicle through the telematic unit.
+syntax = "proto2";
+
+package sts.v1;
+
+// Control command sent to a telematic unit
+//
+// Published on the `<box id>/ctl` topic.
+message Control {
+  // An id which is echoed in `Control_Reply::reference_message_id`
+  required uint32 message_id = 1;
+  // Unix time at which the command was created
+  optional uint32 timestamp = 2;
+  // Duration in seconds the command is valid for
+  optional uint32 timeout = 3;
+
+  // Control command type
+  enum Command_t {
+    // Payload: `Preconditioning`
+    cmd_Preconditioning = 0;
+    // Payload: `PowerSettings`
+    cmd_PowerSettings = 1;
+    // **DEPRECATED** Send the current state - No payload
+    //
+    // The TCU ignores this command and returns a `status_ERROR` reply.
+    cmd_GetState = 2 [deprecated = true];
+    // **DEPRECATED** Switch to offline preconditioning plan - No payload
+    //
+    // The TCU ignores this command and returns a `status_ERROR` reply.
+    cmd_Offline_Preconditioning = 3 [deprecated = true];
+    cmd_LuLM_PowerPlan = 4;
+    cmd_LuLM_FallbackPowerPlan = 5;
+  }
+  // Describes the action that should be performed and determines the
+  // type of `payload`
+  required Command_t command = 4;
+  // Further command details
+  //
+  // The value, if present, is always a protobuf encoded message. The `command`
+  // field determines what type of message is stored in here.
+  optional bytes payload = 5;
+}
+
+// Reply to a `Control` message
+//
+// Published on the `ctlR/<box id>` topic.
+message Control_Reply {
+  // Value of `Control::message_id` of the control message that caused this
+  // reply
+  //
+  // This can be used to tell which request this message belongs to.
+  required uint32 reference_message_id = 1;
+  // Unix time at which the reply was created
+  optional uint32 timestamp = 2;
+
+  // Control reply status.
+  enum Status_t {
+    // Everything's okay
+    status_OK = 0;
+    // Some kind of error occurred
+    //
+    // The `Control_Reply::payload` field should contain more details.
+    status_ERROR = 1;
+  }
+  // Result of the command
+  required Status_t status = 3;
+  // Additional details
+  //
+  // The value, if present, is always a protobuf encoded message.
+  optional bytes payload = 5;
+}
+
+// `Control` payload for the `cmd_Preconditioning` command
+message Preconditioning {
+  // Preconditioning duration.
+  required uint32 duration = 2;
+  // Heating preconditioning for cabin.
+  optional bool bRemoteHeatingCabin = 3;
+  // Definition of preconditioning CAN message in case of inactive heating
+  // preconditioning.
+  optional bool def_bRemoteHeatingCabin = 4;
+  // Cooling preconditioning for cabin.
+  optional bool bRemoteCoolingCabin = 5;
+  // Definition of preconditioning CAN message in case of inactive cooling
+  // preconditioning.
+  optional bool def_bRemoteCoolingCabin = 6;
+  // Which heating elements are to be activated.
+  optional sint32 tCabinTarget = 7;
+  // Heating elements to be activated in case of inactive preconditioning.
+  optional sint32 def_tCabinTarget = 8;
+  // If set, all end times for each weekday are set to this value.
+  optional string endTime = 9;
+  // Default preconditioning duration.
+  optional uint32 def_duration = 10;
+  // Offline heating preconditioning.
+  optional bool def_bHeatingCabinEnable = 11;
+  // Threshold for error detection for event.
+  optional uint32 def_preconPowerThreshold = 12;
+  // Temperature threshold for the offline preconditioning.
+  optional int32 def_temperature = 13;
+  // Offline preconditioning end time on Mondays
+  optional string endTimeMonday = 14;
+  // Offline preconditioning end time on Tuesdays
+  optional string endTimeTuesday = 15;
+  // Offline preconditioning end time on Wednesdays
+  optional string endTimeWednesday = 16;
+  // Offline preconditioning end time on Thursdays
+  optional string endTimeThursday = 17;
+  // Offline preconditioning end time on Fridays
+  optional string endTimeFriday = 18;
+  // Offline preconditioning end time on Saturdays
+  optional string endTimeSaturday = 19;
+  // Offline preconditioning end time on Sundays
+  optional string endTimeSunday = 20;
+  // Offline preconditioning on Mondays
+  optional bool offlinePreconMonday = 21;
+  // Offline preconditioning on Tuesdays
+  optional bool offlinePreconTuesday = 22;
+  // Offline preconditioning on Wednesdays
+  optional bool offlinePreconWednesday = 23;
+  // Offline preconditioning on Thursdays
+  optional bool offlinePreconThursday = 24;
+  // Offline preconditioning on Fridays
+  optional bool offlinePreconFriday = 25;
+  // Offline preconditioning on Saturdays
+  optional bool offlinePreconSaturday = 26;
+  // Offline preconditioning on Sundays
+  optional bool offlinePreconSunday = 27;
+}
+
+// `Control` payload for the `cmd_PowerSettings` command
+message PowerSettings {
+  // Duration in seconds the settings should be kept for before switching to
+  // fallback mode (unless another power setting overwrites it before then).
+  required uint32 duration = 2;
+  // The max AC power to use for even hours in fallback mode
+  //
+  // If this value is set, it should be kept until it is overwritten again.
+  optional sint32 def_maxACPowerEven = 3;
+  // The max AC power to use for odd hours in fallback mode
+  //
+  // If this value is set, it should be kept until it is overwritten again.
+  optional sint32 def_maxACPowerOdd = 7;
+  // Value in Watts to limit the AC power to
+  //
+  // If this value isn't present, change to fallback mode immediately.
+  optional sint32 maxACPower = 4;
+
+  // AC mode.
+  enum AC_MODES {
+    NONE = 0;
+    LOAD = 1;
+    GENERATOR = 2;
+  }
+  optional AC_MODES def_stAcMode = 5;
+  // not present means change to default
+  optional AC_MODES stAcMode = 6;
+}
+
+message LuLMPowerSetting {
+  required uint32 timestamp = 1;
+  // DC Power in W
+  optional sint32 maxDCPower = 2;
+  enum AC_MODES {
+    NONE = 0;
+    LOAD = 1;
+    GENERATOR = 2;
+  }
+  optional AC_MODES def_stAcMode = 3;
+  // not present means change to default
+  optional AC_MODES stAcMode = 4;
+  // AC current in A
+  repeated double maxACCurrent = 5 [packed = true];
+}
+
+message LuLMPowerPlan {
+  // only used for logging purposes
+  required uint32 timestamp = 1;
+  repeated LuLMPowerSetting powerSettings = 2;
+}
+
+message LuLMFallbackPowerSetting {
+  // Offset in seconds since midnight
+  required uint32 offset = 1;
+  // AC Power in W
+  optional sint32 maxDCPower = 2;
+  // AC current in A
+  repeated double maxACCurrent = 3 [packed = true];
+}
+
+message LuLMFallbackPowerPlan {
+  // only used for logging purposes
+  required uint32 timestamp = 1;
+  repeated LuLMFallbackPowerSetting fallbackPowerSetting = 2;
+}

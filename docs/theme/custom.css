@@ -1,0 +1,70 @@
+/* generally slim down the tables a bit because we have a lot to show */
+table {
+    font-size: 1.3rem;
+    width: 100%;
+}
+
+td,
+th {
+    padding: 3px 5px !important;
+}
+
+@media print {
+
+    /* make sure tables fit onto the page */
+    table {
+        table-layout: fixed;
+        page-break-inside: avoid;
+    }
+
+    /* HACK: avoid page breaks right after headings */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6 {
+        page-break-inside: avoid;
+    }
+
+    h1::after,
+    h2::after,
+    h3::after,
+    h4::after,
+    h5::after,
+    h6::after {
+        content: "";
+        display: block;
+        height: 100px;
+        margin-bottom: -100px;
+    }
+
+    /* chapter numbers */
+
+    body {
+        counter-reset: chapter-l1 0;
+    }
+
+    h1 {
+        counter-reset: chapter-l2 0;
+    }
+
+    h2 {
+        counter-reset: chapter-l3 0;
+    }
+
+    h1::before {
+        counter-increment: chapter-l1;
+        content: counter(chapter-l1) " ";
+    }
+
+    h2::before {
+        counter-increment: chapter-l2;
+        content: counter(chapter-l1) "." counter(chapter-l2) " ";
+    }
+
+    h3::before {
+        counter-increment: chapter-l3;
+        content: counter(chapter-l1) "." counter(chapter-l2)"." counter(chapter-l3) " ";
+    }
+}

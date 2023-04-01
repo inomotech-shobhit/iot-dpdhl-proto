@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package sts.v2;
+
+message ValuePerPhase {
+  optional int32 phase1 = 1;
+  optional int32 phase2 = 2;
+  optional int32 phase3 = 3;
+}

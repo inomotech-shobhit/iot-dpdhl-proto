@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package sts.v2.control;
+
+import "google/protobuf/timestamp.proto";
+
+// Generic clients always use even numbers and well-known clients use uneven
+// ones.
+enum RpcClient {
+  // Unknown or unidentified client.
+  RPC_CLIENT_UNSPECIFIED = 0;
+  // Generic developer tool.
+  RPC_CLIENT_GX_DEV_TOOL = 2;
+  // Generic charging controller.
+  RPC_CLIENT_GX_CHARGING_CONTROLLER = 4;
+  // com.streetscooter.llw
+  RPC_CLIENT_WK_LLW = 1;
+  // com.iav.lulm
+  RPC_CLIENT_WK_LULM = 3;
+  // com.inomotech.ramphastos
+  RPC_CLIENT_WK_RAMPHASTOS = 5;
+  // Client is a vehicle
+  RPC_CLIENT_VEHICLE = 6;
+}
+
+message RpcIdentifier {
+  // UUID in big-endian encoding.
+  //
+  // Valid values contain exactly 16 bytes.
+  //
+  // If this field is missing or set to an invalid UUID, the value should be
+  // interpreted as the Nil UUID.
+  bytes id = 1;
+  // Client performing the request.
+  RpcClient client = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message RpcRequest {
+  RpcIdentifier rpc_id = 1;
+}
+
+enum RpcStatus {
+  RPC_STATUS_UNSPECIFIED = 0;
+  RPC_STATUS_OK = 1;
+  // Request invalid.
+  RPC_STATUS_BAD_REQUEST = 2;
+  // Procedure not implemented.
+  RPC_STATUS_UNIMPLEMENTED = 3;
+  // Unable to fulfill the request due to an internal error.
+  RPC_STATUS_INTERNAL_ERROR = 4;
+  // Command received was outside of the set timeout interval
+  RPC_STATUS_COMMAND_TIMEOUT = 5;
+}
+
+message RpcResponse {
+  RpcIdentifier rpc_id = 1;
+  RpcStatus status = 2;
+  optional string message = 3;
+}

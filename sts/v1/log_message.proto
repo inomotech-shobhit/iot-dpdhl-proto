@@ -1,0 +1,807 @@
+// Signal log related messages sent by a telematic unit.
+syntax = "proto2";
+
+package sts.v1;
+
+// Measurements of a CAN signal
+//
+// This message encodes multiple measurements of a single signal and encodes
+// them in an efficient manner.
+message SignalMeasurement {
+  // Signal ID
+  //
+  // This should be the CAN signal name.
+  required string signal_id = 1;
+  // Times the measurements were recorded at
+  //
+  // Each value represents the time difference to the previous measurement. The
+  // first value is always the time since the start of the signal pack.
+  //
+  // In order to interpret the values, the `time_scale` needs to be considered.
+  //
+  // Here's how to calculate the absolute time offset from the signal pack's
+  // start at a given index `i`:
+  // ```python
+  // def get_timestamp(m: SignalMeasurement, i: int) -> int:
+  //   if i == 0:
+  //     # the first element is always the absolute value
+  //     return m.ts_diff[0] * m.time_scale
+  //   return get_timestamp(m, i - 1) + m.ts_diff[i] * m.time_scale
+  // ```
+  repeated uint64 ts_diff = 2 [packed = true];
+  // Recorded values
+  //
+  // Each value is the difference to the previous one. The first value, however,
+  // represents the absolute value.
+  //
+  // In order to interpret the values, the `encode_step` needs to be considered.
+  //
+  // Here's how to calculate the absolute value at a given index `i`:
+  // ```python
+  // def get_value(m: SignalMeasurement, i: int) -> float:
+  //   if i == 0:
+  //     # the first element is always the absolute value
+  //     return m.diff[0] * m.encode_step
+  //   return get_value(m, i - 1) + m.diff[i] * m.encode_step
+  // ```
+  repeated sint64 diff = 3 [packed = true];
+  // Time scale measured in microseconds
+  //
+  // Defaults to 1e6 (1 second).
+  //
+  // Since the differences are stored as whole numbers, this value also
+  // represents the minimum amount of time between measurements.
+  optional uint64 time_scale = 4 [default = 1000000];
+  // Value scale factor
+  //
+  // Every value in `diff` must be multiplied by this number.
+  //
+  // Defaults to 1.
+  optional float encode_step = 5 [default = 1];
+}
+
+// Pack of multiple signal measurements for a given time frame
+message SignalPack {
+  // Vehicle identification number
+  optional string vin = 1;
+  // Unix time at which the pack starts
+  required int64 ts_start = 2;
+  // Microsecond part of the timestamp
+  optional uint32 usecs_start = 3;
+  // Unix time at which the pack ends
+  optional int64 ts_end = 4;
+  // Microsecond part of the timestamp
+  optional uint32 usecs_end = 5;
+  // Measurements contained within the pack
+  repeated SignalMeasurement measurements = 6;
+}
+
+// Collection of CAN signals published by a telematic unit
+//
+// Published to topic `L/<box id>`.
+//
+// Relation between the different signal messages:
+//
+// `SignalLog` > `SignalPack` > `SignalMeasurement`
+message SignalLog {
+  // Vehicle identification number
+  optional string vin = 1;
+  // Signal packs for time frames
+  repeated SignalPack signal_pack = 2;
+  // Current DBC version
+  optional uint32 dbc_version = 3;
+}
+
+// Charge statistics sent by a telematic unit after charging
+//
+// Published to topic `C/<box id>`.
+message ChargeStatistic {
+  // Vehicle identification number
+  optional string id = 1;
+
+  // Unix time the charging started at
+  optional uint32 timestamp_start = 2;
+  // Unix time the charging ended at
+  optional uint32 timestamp_end = 3;
+  // Distance in kilometers driven in the last charge
+  optional float km_total = 4;
+
+  // State of charge in percent at the start
+  optional float soc_start_percent = 6;
+  // State of charge in percent at the end
+  optional float soc_end_percent = 7;
+  // Energy at the start.
+  optional float soc_start_kWh = 8;
+  // Energy at the end
+  optional float soc_end_kWh = 9;
+
+  // Total AC energy flowing from the charging station
+  optional float ac_energy = 10;
+  // Total DC energy flowing to the battery
+  optional float dc_energy = 11;
+
+  // Mean voltage during charging
+  optional float uac_avg = 20;
+  // Max voltage during charging
+  optional float uac_max = 21;
+  // Mean current during charging
+  optional float iac_avg = 22;
+  // Max current during charging
+  optional float iac_max = 23;
+  // Mean power during charging
+  optional float pac_avg = 24;
+  // Max power during charging
+  optional float pac_max = 25;
+
+  // Latitude the vehicle was charging at
+  optional float lat = 30;
+  // Longitude the vehicle was charging at
+  optional float lon = 31;
+
+  // Min ambient temperature during charging
+  optional float t_ambient_min = 42;
+  // Max ambient temperature during charging
+  optional float t_ambient_max = 43;
+  // Mean ambient temperature during charging
+  optional float t_ambient_avg = 44;
+  // Min temperature of the battery during charging
+  optional float temp_min = 60;
+  // Max temperature of the battery during charging
+  optional float temp_max = 61;
+}
+
+// Drive statistics sent by a telematic unit after completing a driving session.
+//
+// A 'drive' starts as soon as the vehicle is unplugged AND the ignition is
+// turned on. It ends when the ignition is turned off for at least 30 minutes OR
+// the vehicle is plugged in.
+//
+// All values in the message refer to the time span the vehicle was driving.
+// That is to say, counters and durations start at 0 unless specified otherwise.
+//
+// Published to topic `A/<box id>`.
+message DriveStatistic {
+  // Vehicle identification number
+  //
+  // # StreetScooter implementation
+  //
+  // Signal: `vin`
+  optional string id = 1;
+
+  // Unix time the drive started at
+  //
+  // # StreetScooter implementation
+  //
+  // As soon as the drive starts, the current system time is recorded and
+  // converted to UNIX time.
+  optional uint32 timestamp_start = 2;
+  // Unix time the drive ended at
+  //
+  // # StreetScooter implementation
+  //
+  // As soon as the drive end, the current system time is recorded and converted
+  // to UNIX time.
+  optional uint32 timestamp_end = 3;
+  // Kilometer reading at the start of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // As soon as the drive starts, the most recent reading of the odometer is
+  // recorded.
+  //
+  // Signal: `ICAN_500_BCM_C2C_sTotalDistance`
+  optional float km_start = 4;
+  // Kilometer reading at the end of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever a new odometer reading is received that is bigger than the current
+  // value, record it. This means that this field will contain the most recent
+  // odometer reading when the drive ends.
+  //
+  // Signal: `ICAN_500_BCM_C2C_sTotalDistance`
+  optional float km_end = 5;
+
+  // State of charge at the start of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // As soon as the drive starts, the most recent state of charge value is
+  // recorded.
+  //
+  // Signal: `ICAN_560_BCM_C2C_percSoc`
+  optional float soc_start_percent = 6;
+  // State of charge at the end of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // As soon as the drive ends, the most recent state of charge value is
+  // recorded.
+  //
+  // Signal: `ICAN_560_BCM_C2C_percSoc`
+  optional float soc_end_percent = 7;
+  // Energy in the battery at the start of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float soc_start_kWh = 8;
+  // Energy in the battery at the end of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float soc_end_kWh = 9;
+
+  // Amount of times the ignition was turned on
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the ignition is turned on, the value is increased by one. This
+  // includes the initial ignition that started the drive, so this
+  // value always starts at 1.
+  //
+  // Signal: `input_kl15a`
+  optional uint32 ignition_count = 20;
+  // Total duration in seconds the ignition was turned on for
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the ignition is turned off, calculate the seconds that passed
+  // since the ignition was turned on and add it to this value.
+  //
+  // Signal: `input_kl15a`
+  optional float ignition_time = 21;
+  // Amount of times the vehicle stopped still
+  //
+  // # StreetScooter implementation
+  //
+  // When the vehicle speed decreases below 2.5 km/h and stays there for at
+  // least 30 seconds, increase this number by one. The speed must increase
+  // above 2.5 km/h before this number can be increased again.
+  //
+  // Signal: `ICAN_500_BCM_C2C_vVehicleSpeed`
+  optional uint32 stops = 22;
+  // Amount of times the vehicle accelerated
+  //
+  // # StreetScooter implementation
+  //
+  // If the vehicle speed increases by at least 5 km/h compared to just before
+  // the acceleration started, increment this number once. The number can only
+  // be incremented once per acceleration. In order for it to be incremented
+  // again, the vehicle speed has to decrease first.
+  //
+  // Signal: `ICAN_500_BCM_C2C_vVehicleSpeed`
+  optional uint32 accelerations = 23;
+  // Amount of times the vehicle was able to recuperate from breaking
+  //
+  // # StreetScooter implementation
+  //
+  // This value is incremented by one whenever the battery current switches
+  // direction from flowing out to in. The battery has to start draining again,
+  // before this value can increase again.
+  //
+  // Signal: `ICAN_185_BMS_VCU_iPack`
+  optional uint32 recuperations = 24;
+  /// Amount of times the vehicle stopped for a delivery.
+  ///
+  /// A "delivery" counts as the vehicle slowing down to below 2.5 km/h, opening
+  /// any door, and then speeding up again. Though not explicitly expressed
+  /// through the logic, it is assumed that the driver will actually leave the
+  /// vehicle after opening a door
+  //
+  // # StreetScooter implementation
+  //
+  // Signals:
+  //
+  // - `ICAN_500_BCM_C2C_vVehicleSpeed`
+  // - `ICAN_510_BCM_C2C_bAnyDoorOpen`
+  optional uint32 delivery_stops = 25;
+
+  // Total driving time in seconds
+  //
+  // # StreetScooter implementation
+  //
+  // Count the seconds the vehicle speed is above 2.5 km/h.
+  //
+  // Signal: `ICAN_500_BCM_C2C_vVehicleSpeed`
+  optional float driving_time = 30;
+  // Time in seconds spent in drive mode D
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the drive mode changes, calculate the seconds passed to the prior
+  // change.
+  //
+  // > **Note:** There is an implicit drive mode change at the start of the
+  // > drive. This means that even if the drive mode hasn't changed in days, the
+  // > time only counts from the start of the drive.
+  //
+  // Signal: `ICAN_500_BCM_C2C_noDrvMode`
+  optional float drivemode_d_time = 31;
+  // Time in seconds spent in drive mode N
+  //
+  // # StreetScooter implementation
+  //
+  // See: `drivemode_d_time`.
+  optional float drivemode_n_time = 32;
+  // Time in seconds spent in drive mode R
+  //
+  // # StreetScooter implementation
+  //
+  // See: `drivemode_d_time`.
+  optional float drivemode_r_time = 33;
+  // Time in seconds spent in drive mode E
+  //
+  // # StreetScooter implementation
+  //
+  // See: `drivemode_d_time`.
+  optional float drivemode_e_time = 34;
+  // Time in seconds spent in drive mode P
+  //
+  // # StreetScooter implementation
+  //
+  // See: `drivemode_d_time`.
+  optional float drivemode_p_time = 35;
+
+  // Ambient temperature in celsius at the start of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // At the start of the drive, record the most recent temperature reading.
+  //
+  // Signal: `ICAN_510_BCM_C2C_tAmbient`
+  optional float t_ambient_start = 40;
+  // Ambient temperature in celsius at the end of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // At the end of the drive, record the most recent temperature reading.
+  //
+  // Signal: `ICAN_510_BCM_C2C_tAmbient`
+  optional float t_ambient_end = 41;
+  // Min ambient temperature in celsius
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the ambient temperature changes, check whether the value is lower
+  // than the current one and if so, record it. The value starts with the same
+  // value as `t_ambient_start`.
+  //
+  // Signal: `ICAN_510_BCM_C2C_tAmbient`
+  optional float t_ambient_min = 42;
+  // Max ambient temperature in celsius
+  //
+  // # StreetScooter implementation
+  //
+  // Analogous to `t_ambient_min` but updates whenever the value is bigger
+  // than the current one.
+  //
+  // Signal: `ICAN_510_BCM_C2C_tAmbient`
+  optional float t_ambient_max = 43;
+  // Mean ambient temperature in celsius weighted by time
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the ambient temperature value changes, multiply the new value by
+  // the time in seconds passed since the previous change. At the end of the
+  // drive, sum up all of the calculations and divide them by the total drive
+  // time (in seconds).
+  //
+  // Signal: `ICAN_510_BCM_C2C_tAmbient`
+  optional float t_ambient_avg = 44;
+
+  // SOC in percent used by the vehicle
+  //
+  // # StreetScooter implementation
+  //
+  // At the end of the drive, calculate the difference between
+  // `soc_end_percent` and `soc_start_percent` and record it.
+  //
+  // Signal: `ICAN_560_BCM_C2C_percSoc`
+  optional float energy_soc = 50;
+  // Mean SOC in percent used per 100km
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float energy_per100km_soc = 51;
+  // Energy in kWh used
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever either the battery voltage or current changes, calculate the power
+  // by multiplying the most recent values of each signal. Calculate the energy
+  // by multiplying the energy with the time (in seconds) that passed since the
+  // previous integration. Finally, add the calculated energy to the current
+  // value.
+  // At the end of the drive, the final value is divided by `-3.6e6` to get a
+  // positive value in kilowatt hours.
+  //
+  // Signals:
+  //
+  // - `ICAN_185_BMS_VCU_uPack`
+  // - `ICAN_185_BMS_VCU_iPack`
+  optional float energy_integrated = 52;
+  // Mean energy in kWh used per 100km
+  //
+  // # StreetScooter implementation
+  //
+  // At the end of the drive, take the value of `energy_integrated` and divide
+  // it by the difference of `km_end` and `km_start` and multiply the result by
+  // 100.
+  //
+  // Signals:
+  //
+  // - `ICAN_185_BMS_VCU_uPack` (indirect)
+  // - `ICAN_185_BMS_VCU_iPack` (indirect)
+  // - `ICAN_500_BCM_C2C_sTotalDistance` (indirect)
+  optional float energy_per100km_integrated = 53;
+  // Energy in kWh recuperated
+  //
+  // # StreetScooter implementation
+  //
+  // Similar to `energy_integrated` but only add positive energies to the sum
+  // and as such, divide by positive `3.6e6` instead of `-3.6e6`.
+  //
+  // Signals:
+  //
+  // - `ICAN_185_BMS_VCU_uPack`
+  // - `ICAN_185_BMS_VCU_iPack`
+  optional float recuperated_energy = 54;
+  // Energy in kWh used for heating
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float heating_energy = 55;
+  // Energy in kWh used for cooling / ventilating
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float climate_energy = 56;
+
+  // Min temperature in celsius of the battery
+  //
+  // # StreetScooter implementation
+  //
+  // Same idea as `t_ambient_min` but using the minimum temperature reported by
+  // the battery.
+  //
+  // Signal: `ICAN_560_BCM_C2C_tMinPack`
+  optional float temp_min = 60;
+  // Max temperature in celsius of the battery
+  //
+  // # StreetScooter implementation
+  //
+  // Same idea as `t_ambient_max` but using the maximum temperature reported by
+  // the battery.
+  //
+  // Signal: `ICAN_560_BCM_C2C_tMaxPack`
+  optional float temp_max = 61;
+  // Min battery voltage
+  //
+  // # StreetScooter implementation
+  //
+  // Same idea as `temp_min` but using the voltage reported by the battery.
+  //
+  // Signal: `ICAN_185_BMS_VCU_uPack`
+  optional float u_min = 62;
+  // Max battery voltage
+  //
+  // # StreetScooter implementation
+  //
+  // Same idea as `temp_max` but using the voltage reported by the battery.
+  //
+  // Signal: `ICAN_185_BMS_VCU_uPack`
+  optional float u_max = 63;
+  // Min battery current
+  //
+  // # StreetScooter implementation
+  //
+  // Same idea as `u_min` but using the current reported by the battery.
+  //
+  // Signal: `ICAN_185_BMS_VCU_iPack`
+  optional float i_min = 64;
+  // Max battery current
+  //
+  // # StreetScooter implementation
+  //
+  // Same idea as `u_max` but using the current reported by the battery.
+  //
+  // Signal: `ICAN_185_BMS_VCU_iPack`
+  optional float i_max = 65;
+
+  // Amount of times the hand brake was engaged
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the hand brake is engaged, increase this value by one.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bHandBrkSt`
+  optional uint32 hand_brake_count = 70;
+  // Total duration in seconds the hand brake was engaged for
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the hand brake is engaged, count the seconds until it is released
+  // again and add the duration to this value. If the hand brake is already
+  // engaged at the start of the drive, start counting from then.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bHandBrkSt`
+  optional float hand_brake_time = 71;
+
+  // Amount of times any of the doors were open.
+  //
+  // This only counts the times it switches from no door open to any door open.
+  // It doesn't matter if another door is opened.
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the signal switches from 'no door open' to 'any door open', this
+  // value is increased by one.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bAnyDoorOpen`
+  optional uint32 door_open_count = 80;
+  // Amount of times the doors were locked
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the doors are locked from previously being unlocked, increase this
+  // value by one.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bDoorLockState`
+  optional uint32 door_lock_count = 81;
+  // Amount of times the driver seat belt was used
+  //
+  // # StreetScooter implementation
+  //
+  // Whenever the driver seat belt is closed, the counter is increased by one.
+  // If the seat belt is already closed when the drive starts, the value is
+  // currently not incremented. This could be considered a bug.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bSeatBeltStLeft`
+  optional uint32 belt_use_count = 82;
+  // Amount of times the front window heating was turned on
+  //
+  // # StreetScooter implementation
+  //
+  // The value is incremented when the front window heating state changes to on.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bFrontWindowHeating`
+  optional uint32 front_window_heating_count = 83;
+  // Duration in seconds the front window heating was on for
+  //
+  // # StreetScooter implementation
+  //
+  // Count the amount of seconds the front window heating is on before being
+  // turned back off and sum it up to this value.
+  //
+  // Signal: `ICAN_510_BCM_C2C_bFrontWindowHeating`
+  optional float front_window_heating_time = 84;
+
+  // Duration in seconds the left indicator was blinking
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float left_indicator_time = 100;
+  // Amount of times the left indicator was turned on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 left_indicator_count = 101;
+  // Duration in seconds the right indicator was blinking
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float right_indicator_time = 102;
+  // Amount of times the right indicator was turned on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 right_indicator_count = 103;
+  // Duration in seconds the hazard lights were on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float hazard_time = 104;
+  // Amount of times the hazard lights were turned on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 hazard_count = 105;
+  // Duration in seconds the low beam was on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float low_beam_time = 106;
+  // Amount of times low beam was turned on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 low_beam_count = 107;
+  // Duration in seconds the high beam was on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float high_beam_time = 108;
+  // Amount of times high beam was turned on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 high_beam_count = 109;
+  // Duration in seconds the parking light was on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float parking_light_time = 110;
+  // Amount of times the parking light was on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 parking_light_count = 111;
+  // Total duration in seconds the rear fog lights were turned on for
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float rear_fog_light_time = 112;
+  // How many times the rear fog lights were turned on
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional uint32 rear_fog_light_count = 113;
+
+  // Latitude of the vehicle at the start of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // At the start of the drive, record the most recent latitude value.
+  //
+  // Signal: `gps_latitude`
+  optional float lat_start = 140;
+  // Longitude of the vehicle at the start of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // At the start of the drive, record the most recent longitude value.
+  //
+  // Signal: `gps_longitude`
+  optional float lon_start = 141;
+  // Latitude of the vehicle at the end of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // At the end of the drive, record the most recent latitude value.
+  //
+  // Signal: `gps_latitude`
+  optional float lat_end = 142;
+  // Longitude of the vehicle at the end of the drive
+  //
+  // # StreetScooter implementation
+  //
+  // At the end of the drive, record the most recent longitude value.
+  //
+  // Signal: `gps_longitude`
+  optional float lon_end = 143;
+
+  // Distance driven in meters as measured by the GPS
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float gps_distance = 144;
+  // Total ascent in meters
+  //
+  // # StreetScooter implementation
+  //
+  // Every time the GPS module reports a new height value, take the difference
+  // to the previous value and if it's strictly positive, add it to the current
+  // value.
+  //
+  // Signal: `gps_height`
+  optional float ascent = 145;
+  // Total descent in meters
+  //
+  // # StreetScooter implementation
+  //
+  // Every time the GPS module reports a new height value, take the difference
+  // to the previous value and if it's strictly negative, add the absolute value
+  // to the value. This value is always positive.
+  //
+  // Signal: `gps_height`
+  optional float descent = 146;
+
+  // Max speed in km/h
+  //
+  // # StreetScooter implementation
+  //
+  // For each new vehicle speed value, check if it's bigger than the current
+  // value stored in this field and if it is, set it as the current value.
+  //
+  // Signal: `ICAN_500_BCM_C2C_vVehicleSpeed`
+  optional float speed_max = 150;
+  // Average speed in km/h when the vehicle was running
+  //
+  // # StreetScooter implementation
+  //
+  // At the end of the drive, calculate the total distance driven using
+  // `km_end - km_start` and divide it by `ignition_time`.
+  //
+  // Signals:
+  //
+  // - `input_kl15a` (indirect)
+  // - `ICAN_500_BCM_C2C_sTotalDistance` (indirect)
+  optional float speed_avg = 151;
+
+  // Ratio the unit was connected to the broker for
+  //
+  // # StreetScooter implementation
+  //
+  // This value is currently not being set.
+  optional float online_ratio = 152;
+}
+
+// Event published by a telematic unit.
+//
+// Published to topic `E/<box id>`.
+message EventMessage {
+  // Event type
+  required string event = 1;
+  // Unix time at which the event was triggered
+  optional int64 ts = 2;
+  // Microsecond part of the timestamp
+  //
+  // Value range: (0 <= `usecs` < 1e6)
+  optional uint32 usecs = 3;
+  // Event payload
+  optional string payload = 4;
+}
+
+// Event published by a c2cbox.
+//
+// Published to topic `E/<box id>`.
+message C2cEventMessage {
+  enum Event_t {
+    ev_None = 0;
+
+    ev_LVBatteryLow = 1;
+    ev_EngineError = 2;
+    ev_TurtleLamp = 3;
+    ev_PlugWithoutACVoltage = 4;
+    ev_HVBatteryError = 5;
+
+    ev_EmergencyChargeRequest = 100;
+    ev_GpsDefective = 101;
+    ev_CanDefective = 102;
+    ev_PreconDefective = 103;
+    ev_SleepModeActivated = 104;
+    ev_BoxWasOffline = 105;
+    ev_ForcedChargingEnabled = 106;
+    ev_FirstBoot = 107;
+  }
+  // Unix time at which the event was triggered
+  optional int64 ts = 1;
+  // Microsecond part of the timestamp
+  //
+  // Value range: (0 <= `usecs` < 1e6)
+  optional uint32 usecs = 2;
+  // Event type
+  optional Event_t event = 3;
+  // Event payload
+  optional string payload = 4;
+}

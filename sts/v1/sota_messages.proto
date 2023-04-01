@@ -1,0 +1,114 @@
+syntax = "proto2";
+
+package sts.v1;
+
+enum SotaCommand_t {
+  cmd_UdsReadDataByIdentifier = 0;
+  cmd_UdsWriteDataByIdentifier = 1;
+  cmd_UdsEcuReset = 2;
+  cmd_RequestSafeState = 3;
+  cmd_Flash = 4;
+  cmd_UdsSecurityAccess = 5;
+  cmd_RunDiagnostics = 6;
+  cmd_RoutineControl = 7;
+  cmd_SotaAlphaReply = 8;
+  cmd_ResetRunningSotaProcesses = 9;
+  cmd_SessionControl = 10;
+}
+
+message Sota {
+  required uint32 message_id = 1;
+  optional uint32 timestamp = 2;
+  optional uint32 timeout = 3;
+  required SotaCommand_t command = 4;
+  optional bytes payload = 5;
+}
+
+message Sota_Reply {
+  required uint32 reference_message_id = 1;
+  optional uint32 timestamp = 2;
+  enum Status_t {
+    status_OK = 0;
+    status_ERROR = 1;
+  }
+  required Status_t status = 3;
+  required SotaCommand_t command = 4;
+  optional bytes payload = 5;
+}
+
+message UdsReadDataByIdentifier {
+  // uint16 gibt es nicht
+  repeated uint32 data_identifier = 1 [packed = true];
+  optional uint32 request_id = 2;
+  optional uint32 response_id = 3;
+  optional uint32 remote_address = 4;
+}
+
+message UdsSecurityAccess {
+  optional bytes security_key = 1;
+  optional bytes security_seed = 2;
+  optional uint32 request_id = 3;
+  optional uint32 response_id = 4;
+  // aka level in uds lib
+  optional uint32 sub_function = 5;
+  optional bytes security_access_data_record = 6;
+  optional uint32 remote_address = 7;
+}
+
+message UdsSotaAlphaFlash {
+  optional bytes security_key = 1;
+  optional bytes security_seed = 2;
+  optional uint32 request_id = 3;
+  optional uint32 response_id = 4;
+  // aka level in uds lib
+  optional uint32 sub_function = 5;
+  optional bytes security_access_data_record = 6;
+  repeated bytes fileNames = 7;
+  repeated bytes files = 8;
+  repeated uint32 fileSizes = 9;
+  repeated uint32 fileTypes = 10;
+}
+
+message UdsWriteDataByIdentifier {
+  // uint16 gibt es nicht
+  repeated uint32 data_identifier = 1 [packed = true];
+  required bytes payload = 2;
+  optional uint32 request_id = 3;
+  optional uint32 response_id = 4;
+  optional uint32 remote_address = 5;
+}
+
+message UdsEcuReset {
+  optional uint32 request_id = 1;
+  optional uint32 response_id = 2;
+  optional uint32 resetType = 3;
+  optional uint32 remote_address = 4;
+}
+
+message RoutineControl {
+  optional uint32 request_id = 1;
+  optional uint32 response_id = 2;
+  optional uint32 sub_function = 3;
+  optional uint32 routine_identifier = 4;
+  optional bytes routine_control_option_record = 5;
+  optional uint32 remote_address = 6;
+}
+
+message SessionControl {
+  optional uint32 request_id = 1;
+  optional uint32 response_id = 2;
+  optional uint32 sub_function = 3;
+  optional uint32 remote_address = 4;
+}
+
+message RunDiagnostics {
+  optional bytes file = 1;
+}
+
+message Flash {
+  optional uint32 request_id = 1;
+  optional uint32 response_id = 2;
+  repeated bytes fileNameFlashApplicationName = 3;
+  repeated bytes fileNameFlashApplicationHash = 4;
+  optional uint32 remote_address = 5;
+}

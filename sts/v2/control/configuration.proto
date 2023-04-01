@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package sts.v2.control;
+
+import "google/protobuf/duration.proto";
+import "sts/v2/control/rpc.proto";
+
+message SetVehicleConfigurationRequest {
+  RpcRequest request = 1;
+  optional SetVehicleGeneralConfiguration vehicle_general_configuration = 2;
+  optional SetVehiclePositionConfiguration vehicle_position_configuration = 3;
+}
+
+message SetVehicleGeneralConfiguration {
+  optional google.protobuf.Duration command_timeout = 1;
+}
+
+message GetVehicleGeneralConfiguration {
+  google.protobuf.Duration command_timeout = 1;
+}
+
+message SetVehiclePositionConfiguration {
+  optional uint32 on_change_distance = 1;
+  optional bool send_on_change_plugged_in = 2;
+  optional bool send_on_change_ignition = 3;
+  optional google.protobuf.Duration minimum_sending_period = 4;
+}
+
+message GetVehiclePositionConfiguration {
+  uint32 on_change_distance = 1;
+  bool send_on_change_plugged_in = 2;
+  bool send_on_change_ignition = 3;
+  google.protobuf.Duration minimum_sending_period = 4;
+}
+
+message SetVehicleConfigurationResponse {
+  RpcResponse response = 1;
+  GetVehicleGeneralConfiguration vehicle_general_configuration = 2;
+  GetVehiclePositionConfiguration vehicle_position_configuration = 3;
+}
+
+service VehicleConfigurationService {
+  rpc SetVehicleConfiguration(SetVehicleConfigurationRequest) returns (SetVehicleConfigurationResponse);
+}

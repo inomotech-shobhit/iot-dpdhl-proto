@@ -1,0 +1,81 @@
+syntax = "proto2";
+
+package sts.v1;
+
+message SignalStatus {
+  required int64 ts = 1;
+  optional uint32 usecs = 2;
+  required float value = 3;
+}
+
+message BoolSignalStatus {
+  required int64 ts = 1;
+  optional uint32 usecs = 2;
+  optional float fValue = 3;
+  optional bool bValue = 4;
+}
+
+message OnlineStatus {
+  optional int64 ts = 1;
+  optional uint32 usecs = 2;
+  required bool online = 3;
+}
+
+message VINStatus {
+  required int64 ts = 1;
+  optional uint32 usecs = 2;
+  required string vin = 3;
+}
+
+message PositionStatus {
+  optional int64 ts = 1;
+  optional uint32 usecs = 2;
+  required float lat = 3;
+  required float lon = 4;
+}
+
+message MetricSignal {
+  repeated string signals = 1;
+
+  enum Aggregation_t {
+    first = 0;
+    last = 1;
+    min = 2;
+    max = 3;
+    count = 4;
+    time = 5;
+    integration = 6;
+    average = 7;
+    median = 8;
+  }
+  required Aggregation_t aggregation = 2;
+  required double value = 3;
+
+  enum Unit_t {
+    None = 0;
+    V = 1;
+    A = 2;
+    mV = 3;
+    mA = 4;
+    W = 5;
+    kW = 6;
+    Wh = 7;
+    kWh = 8;
+    degC = 9;
+    secs = 10;
+  }
+  optional Unit_t unit = 4;
+}
+
+message Metric {
+  required int64 start = 1;
+  required int64 end = 2;
+
+  enum Metric_t {
+    idle = 0;
+    driving = 1;
+    charging = 2;
+  }
+  required Metric_t type = 3;
+  repeated MetricSignal metricSignals = 4;
+}

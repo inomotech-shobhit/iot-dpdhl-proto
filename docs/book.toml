@@ -1,0 +1,30 @@
+[book]
+authors = ["StreetScooter GmbH"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Vehicle Communication Protocol"
+
+[preprocessor.katex]
+
+[preprocessor.admonish]
+command = "mdbook-admonish"
+assets_version = "2.0.0"    # do not edit: managed by `mdbook-admonish install`
+
+[output.html]
+curly-quotes = true
+additional-css = ["theme/custom.css", "theme/mdbook-admonish.css"]
+
+[output.katex]
+
+[output.linkcheck]
+follow-web-links = true
+
+[output.pdf]
+optional = true
+print-background = true
+margin-left = 0.3
+margin-right = 0.3
+display-header-footer = true
+header-template = "<div style='display:flex; font-size:8px; justify-content:space-between; margin: 0 0.4in; width:100%;'><span class='title'></span><span>{{VERSION}}</span></div>"
+footer-template = "<div style='display:flex; font-size:8px; justify-content:space-between; margin: 0 0.4in; width:100%;'><span>{{DATE}}</span><div><span class='pageNumber'></span> / <span class='totalPages'></span></div></div>"

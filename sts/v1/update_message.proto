@@ -1,0 +1,57 @@
+syntax = "proto2";
+
+package sts.v1;
+
+enum UpdateCommand_t {
+  cmd_GetVersion = 0;
+  cmd_Update = 1;
+  cmd_Restore = 2;
+  cmd_Status = 3;
+  cmd_Reboot = 4;
+}
+
+message TcuUpdate {
+  required string update_name = 1;
+  optional string required_version = 2;
+  optional string target_version = 3;
+}
+
+message TcuUpdateCommand {
+  required uint32 message_id = 1;
+  optional uint32 timestamp = 2;
+  optional uint32 timeout = 3;
+  required UpdateCommand_t command = 4;
+  optional TcuUpdate update_data = 5;
+}
+
+message TcuVersionInfo {
+  required string name = 1;
+  required string version = 2;
+  optional string variant = 3;
+}
+
+message UpdateReply {
+  required uint32 reference_message_id = 1;
+  optional uint32 timestamp = 2;
+  enum Status_t {
+    status_OK = 0;
+    status_OFFLINE = 1;
+    status_READY_FOR_UPDATE = 2;
+    status_UPDATE_IN_PROGRESS = 3;
+    status_UPDATE_SUCCESSFUL = 4;
+    status_ERROR = 5;
+    status_ERROR_FILE_NOT_FOUND = 6;
+    status_ERROR_DOWNGRADE_REQUESTED = 7;
+    status_ERROR_VERSION_MISMATCH = 8;
+    status_ERROR_REQUEST_INCOMPLETE = 9;
+    status_ERROR_DOWNLOAD_UNSUCCESSFUL = 10;
+    status_ERROR_UPDATE_UNSUCCESSFUL = 11;
+  }
+  required Status_t status = 3;
+  required UpdateCommand_t command = 4;
+  optional bytes payload = 5;
+}
+
+message Status {
+  optional bool online = 1;
+}

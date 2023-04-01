@@ -1,0 +1,8 @@
+version: v1
+plugins:
+  - name: cpp
+    out: gen/cpp
+  - name: csharp
+    out: gen/csharp
+  - name: python
+    out: gen/python

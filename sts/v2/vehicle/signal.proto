@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package sts.v2.vehicle;
+
+import "google/protobuf/timestamp.proto";
+import "sts/v2/types.proto";
+
+message Position {
+  double lat = 1;
+  double lon = 2;
+}
+
+message OnlineStatus {
+  ConnectivityStatus connectivity_status = 1;
+  string protocol_version = 2;
+}
+
+enum ChargePlugStatus {
+  CHARGE_PLUG_STATUS_UNSPECIFIED = 0;
+  CHARGE_PLUG_STATUS_DISCONNECTED = 1;
+  CHARGE_PLUG_STATUS_CONNECTED_UNLOCKED = 2;
+  CHARGE_PLUG_STATUS_CONNECTED_LOCKED = 3;
+  CHARGE_PLUG_STATUS_LOCKING_ERROR = 4;
+}
+
+enum ConnectivityStatus {
+  CONNECTIVITY_STATUS_UNSPECIFIED = 0;
+  CONNECTIVITY_STATUS_ONLINE = 1;
+  CONNECTIVITY_STATUS_OFFLINE = 2;
+  CONNECTIVITY_STATUS_OFFLINE_UNGRACEFUL = 3;
+}
+
+enum IgnitionStatus {
+  IGNITION_STATUS_UNSPECIFIED = 0;
+  IGNITION_STATUS_OFF = 1;
+  IGNITION_STATUS_ON = 2;
+  IGNITION_STATUS_ACCESSORY = 3;
+}
+
+message PreconditioningStatus {
+  bytes preconditioning_schedule_request_id = 1;
+  uint32 preconditioning_schedule_slice_id = 2;
+  PreconditioningSliceStatus slice_status = 3;
+}
+
+enum PreconditioningSliceStatus {
+  PRECONDITIONING_SLICE_STATUS_UNSPECIFIED = 0;
+  PRECONDITIONING_SLICE_STATUS_START = 1;
+  PRECONDITIONING_SLICE_STATUS_END = 2;
+  PRECONDITIONING_SLICE_STATUS_CANCELLED_CUTOFF_SOC = 3;
+  PRECONDITIONING_SLICE_STATUS_CANCELLED_CUTOFF_AMBIENT_TEMPERATURE = 4;
+  PRECONDITIONING_SLICE_STATUS_CANCELLED_UNPLUGGED = 5;
+  PRECONDITIONING_SLICE_STATUS_CANCELLED_INTERNAL_ERROR = 6;
+}
+
+message ChargingDcPowerMax {
+  uint32 derating_justified = 1;
+  uint32 derating_unjustified = 2;
+}
+
+enum PowerSettingType {
+  POWER_SETTING_TYPE_UNSPECIFIED = 0;
+  POWER_SETTING_TYPE_FALLBACK_SCHEDULE = 1;
+  POWER_SETTING_TYPE_CHARGING_POWER = 2;
+  POWER_SETTING_TYPE_CHARGING_SCHEDULE = 3;
+  POWER_SETTING_TYPE_INTERNAL = 4;
+}
+
+message ACCurrentRealized {
+  sts.v2.ValuePerPhase realized_ac_current = 1;
+  PowerSettingType type = 2;
+  optional bytes rpc_id = 3; 
+  optional uint32 slice_id = 4; 
+}
+
+// The reason we're using a single message containing all supported value types
+// rather than defining a message for each and every topic is because it's
+// easier to debug.
+message Signal {
+  // Was used for the old `OnlineStatus` enum prior to the protocol version merge.
+  reserved 7;
+
+  google.protobuf.Timestamp timestamp = 1;
+  // If this field doesn't contain the expected value, the entire message is to
+  // be treated as invalid. Type coercion is strongly discouraged (even from
+  // `double` to `sint64` and vice versa).
+  oneof value {
+    string text = 2;
+    double real_number = 3;
+    sint64 integer_number = 4;
+    Position position = 5;
+    ChargePlugStatus charge_plug_status = 6;
+    OnlineStatus online_status = 13;
+    IgnitionStatus ignition_status = 8;
+    PreconditioningStatus preconditioning_status = 9;
+    ChargingDcPowerMax charging_dc_power_max = 10;
+    sts.v2.ValuePerPhase value_per_phase = 11;
+    ACCurrentRealized ac_current_realized = 12;
+  }
+}

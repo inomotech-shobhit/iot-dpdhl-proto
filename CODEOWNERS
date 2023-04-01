@@ -1,0 +1,8 @@
+[Documentation]
+docs/   @scootermon
+
+[Protobuf Files]
+sts/v2/ @scootermon
+
+[Tools]
+tools/  @scootermon

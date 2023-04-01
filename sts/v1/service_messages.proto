@@ -1,0 +1,352 @@
+// Service command messages.
+//
+// Service commands provide another RPC-like mechanism similar to control
+// commands. The request and response scheme is practically identical, but for
+// some reason both of them exist independently. One difference though is that
+// there are way more service commands.
+
+syntax = "proto2";
+
+package sts.v1;
+
+// Service command sent to a telematic unit.
+//
+// Published on the `<box id>/service` topic.
+message Service {
+  // Unique message id used to find the corresponding `ServiceReply`.
+  required uint32 message_id = 1;
+  // Unix time at which the service command was created.
+  optional uint32 timestamp = 2;
+  // Timeout in seconds before the command expires and any ongoing work should
+  // be aborted.
+  optional uint32 timeout = 3;
+
+  // Command types that can be sent in a service command.
+  enum Command_t {
+    // unsorted
+    cmd_ReverseTunnel = 0;
+    cmd_GetFile = 1;
+    // timestamps from saved data in specified time range
+    cmd_GetSignalLogs = 2;
+    // get version from package
+    cmd_GetVersion = 3;
+    // **DEPRECATED** Update package
+    cmd_Update = 4 [deprecated = true];
+    // request saved signal data in specified time range
+    cmd_SendSignalLogs = 5;
+    // get syslog
+    cmd_GetSyslog = 6;
+    // get network statistics
+    cmd_GetTrafficStats = 7;
+    // get dtcs
+    cmd_GetDiagnosticTroubleCodes = 10;
+    // clear dtcs
+    cmd_ClearDiagnosticTroubleCodes = 11;
+    // reboot c2cbox
+    cmd_Reset = 12;
+    // change wifi configurations
+    cmd_WifiConfig = 13;
+    // Remove signals from permanent storage
+    cmd_DeleteSignalLogs = 14;
+
+    // get configuration information
+    // not implemented
+    cmd_GetPartNumber = 100;
+    // not implemented
+    cmd_GetSerialNumber = 101;
+    // not implemented
+    cmd_GetFallbackPower = 102;
+    // get logging information
+    cmd_GetDetailedLogging = 103;
+    // not implemented
+    cmd_GetSignalStatus = 104;
+    // Get vin from config file (useful if can is defective)
+    cmd_GetVinFromConfigFile = 105;
+    cmd_GetState = 106;
+
+    // set configurations
+    // not implemented
+    cmd_SetFallbackPower = 202;
+    // not implemented
+    cmd_SetDetailedLogging = 203;
+    // change entry in c2cbox
+    cmd_ChangeConfigEntry = 204;
+    cmd_ChangeBoxId = 205;
+    cmd_GetDbcFile = 206;
+    cmd_SetDbcFile = 207;
+
+    // update
+    cmd_UpdateFile = 300;
+    cmd_RunMultipleUpdates = 301;
+
+    // ssh settings
+    cmd_GenerateNewSSHKey = 400;
+    cmd_ApplyNewSSHKey = 401;
+    cmd_GetSSHInfo = 402;
+    cmd_GenerateNewSSLCertRequest = 410;
+    cmd_DownloadAndApplyNewSSLCert = 411;
+    cmd_GetSSLInfo = 412;
+
+    // Resend state signals
+    cmd_GetBoxInfo = 500;
+    // Set system time of unit
+    cmd_SetTime = 501;
+    // Set system timezone of unit
+    cmd_SetTimezone = 502;
+
+    // **DEPRECATED** Try to repair sd card --> file check routine
+    cmd_RepairSdCard = 601 [deprecated = true];
+  }
+  // Command that should be performed.
+  //
+  // This field determines what the message encoded in `payload` is.
+  required Command_t command = 4;
+  // Protobuf encoded message containing further details.
+  //
+  // The appropriate message type needs to be inferred from the `command` field.
+  optional bytes payload = 5;
+}
+
+// Response to a `Service` command.
+//
+// Published on the `serviceR/<box id>` topic.
+message Service_Reply {
+  // `Service::message_id` of the service message this is a response to.
+  required uint32 reference_message_id = 1;
+  // UNIX time at which the reply was created.
+  optional uint32 timestamp = 2;
+
+  // Status of a service.
+  enum Status_t {
+    // Service command executed successfully.
+    status_OK = 0;
+    // An error occurred.
+    //
+    // Ideally, the `payload` should contain more details, but in reality it
+    // never does.
+    status_ERROR = 1;
+  }
+  // Status of the service command execution.
+  required Status_t status = 3;
+  // Encoded protobuf message containing further response details.
+  //
+  // The message type is based on the service's command (`Service::command`).
+  optional bytes payload = 5;
+}
+
+message ReverseTunnel {
+  optional uint32 port = 1;
+}
+
+message GetFile {
+  required string filename = 1;
+  optional uint32 max_size = 2;
+  optional bool compress = 3;
+}
+
+message GetSignalLogs {
+  required uint32 ts_start = 1;
+  required uint32 ts_end = 2;
+}
+
+message GetSignalLogsReply {
+  // diff encoded
+  repeated uint32 timestamps = 1 [packed = true];
+}
+
+// Ask the box to send historical data.
+//
+// Response will contain logs whose creation time is `>= ts_start` and `<=
+// ts_end`.
+message SendSignalLogs {
+  // reserved for c2cbox
+  reserved 5, 6;
+
+  // **DEPRECATED** Use `ts_start` and `ts_end`.
+  //
+  // Diff encoded
+  repeated uint32 timestamps = 1 [
+    packed = true,
+    deprecated = true
+  ];
+  // Signal logs response channel.
+  enum SendType_t {
+    // Send the logs over the dedicated log channel.
+    //
+    // topic: `L/<box id>`
+    LogChannel = 1;
+    // Send the logs as a service response.
+    //
+    // topic: `serviceR/<box id>`
+    Reply = 2;
+    // Send the logs as a service response, but zipped.
+    //
+    // topic: `serviceR/<box id>`
+    CompressedReply = 3;
+  }
+  // Instruct the box on how to send the response.
+  //
+  // The send channel only applies to `send_logs`.
+  optional SendType_t sendChannel = 2 [default = Reply];
+  // Unix time to start sending logs from.
+  //
+  // Must be strictly smaller than `ts_end`.
+  optional uint32 ts_start = 3;
+  // Unix time to stop sending logs.
+  //
+  // Must be strictly bigger than `ts_start`.
+  optional uint32 ts_end = 4;
+  // Signal names that should be included.
+  //
+  // If empty, send all signals.
+  repeated string signals = 7;
+  // Ask the box to send historical signal data.
+  //
+  // This defaults to true, if neither `send_charge_statistics` nor
+  // `send_drive_statistics` is set.
+  //
+  // Both `ts_start` and `ts_end` must be set, otherwise an error is returned.
+  optional bool send_logs = 8;
+  // Ask the box to send its stored charge statistics.
+  //
+  // Both `ts_start` and `ts_end` must be set, otherwise an error is returned.
+  optional bool send_charge_statistics = 9;
+  // Ask the box to send its stored drive statistics.
+  //
+  // Both `ts_start` and `ts_end` must be set, otherwise an error is returned.
+  optional bool send_drive_statistics = 10;
+}
+
+message DeleteSignalLogs {
+  // diff encoded
+  repeated uint32 timestamps = 1 [packed = true];
+  optional uint32 ts_start = 2;
+  optional uint32 ts_end = 3;
+  repeated string signals = 4;
+}
+
+message GetVersion {
+  // if not set get system version
+  optional string packageName = 1;
+}
+
+message Update {
+  // if not set update whole system
+  optional string packageName = 1;
+  optional string packageFile = 2;
+}
+
+message VersionInfo {
+  repeated string packageName = 1;
+  repeated string version = 2;
+}
+
+message GetSyslog {
+  // if not present send whole file
+  optional uint32 rows = 1;
+  optional uint32 offset = 2 [default = 0];
+  optional bool compress = 3 [default = false];
+  optional uint32 lastrows = 4;
+}
+
+message Time {
+  required uint32 date = 1;
+}
+
+message DetailedLogging {
+  required bool enabled = 1;
+  required bool autoSend = 2;
+  // not yet implemented
+  optional uint32 interval = 3;
+}
+
+message WifiConfig {
+  // Wireless mode.
+  enum Mode_t {
+    // Access point.
+    AP = 1;
+    // Station.
+    STA = 2;
+  }
+
+  // Wireless security mode.
+  enum Encryption_t {
+    // No security whatsoever, aka r/gatesopencomeonin.
+    None = 1;
+    // "Wired Equivalent Privacy", the original encryption standard for
+    // wireless, deprecated since 2004.
+    Wep = 2;
+    // WPA
+    Psk = 3;
+    // WPA2
+    Psk2 = 4;
+  }
+
+  // Whether to actually enable the wifi module or not.
+  optional bool enable = 1;
+  // Wireless mode.
+  optional Mode_t mode = 2 [default = AP];
+  // SSID
+  optional string ssid = 3 [default = "StreetScooter_C2C"];
+  // encryption
+  optional Encryption_t encryption = 4 [default = None];
+  // key
+  optional string key = 5;
+  // set if firewall allows incoming connections
+  optional bool openFirewall = 6;
+}
+
+message NewSSHKey_Reply {
+  required string public_key = 1;
+  optional string fingerprint = 2;
+}
+
+message DownloadAndApplyNewSSLCert {
+  optional string crt_fingerprint_md5 = 1;
+}
+
+message SSLInfo {
+  optional string serialNumber = 1;
+  optional string validFrom = 2;
+  optional string validTo = 3;
+  optional string fingerprint = 4;
+}
+
+message SSHInfo {
+  optional string id_public_key = 1;
+  optional string id_fingerprint = 2;
+  optional string host_fingerprint = 3;
+}
+
+message ChangeConfigEntry {
+  enum ConfigFile_t {
+    TCU_CONFIG = 1;
+    TELEMETRY_CONFIG = 2;
+    SIGNAL_FORWARDING_CONFIG = 3;
+    WIFI_CONFIG = 4;
+    WATCHDOG_CONFIG = 5;
+    TCU_UPDATER_CONFIG = 6;
+    TIMEKEEPER_CONFIG = 7;
+  }
+
+  required ConfigFile_t configFile = 1;
+  repeated string configEntry = 2;
+  repeated string configValue = 3;
+}
+
+message ChangeBoxId {
+  optional string targetBoxID = 1;
+}
+
+message UpdateFile {
+  optional string serverFilePath = 1;
+  optional string c2cBoxFilePath = 2;
+  optional string fileName = 3;
+}
+
+// `cmd_GetState` payload.
+message State {
+  required string signal_id = 1;
+  optional uint32 timestamp = 2;
+  optional float value = 3;
+}

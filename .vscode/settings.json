@@ -1,0 +1,16 @@
+{
+    "cSpell.words": [
+        "dtcs",
+        "ICAN",
+        "proto",
+        "protobuf",
+        "protoc",
+        "sota",
+        "ssid",
+        "telematic",
+        "usecs"
+    ],
+    "cSpell.enableFiletypes": [
+        "proto3"
+    ]
+}

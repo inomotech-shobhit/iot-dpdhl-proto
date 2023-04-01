@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+package sts.v2.vehicle;
+
+// Charging statistics sent after charging.
+//
+// Published to topic `C/<box id>`.
+//
+// This message is guaranteed to be backwards-compatible with
+// `sts.v1.ChargeStatistic`.
+message ChargeStatistics {
+  reserved 4, 8, 9, 20 to 23, 42 to 44, 60, 61;
+
+  // Vehicle identification number
+  string vin = 1;
+
+  // Unix time the charging started at
+  uint32 timestamp_start = 2;
+  // Unix time the charging ended at
+  uint32 timestamp_end = 3;
+
+  // State of charge in percent at the start
+  float soc_percent_start = 6;
+  // State of charge in percent at the end
+  float soc_percent_end = 7;
+
+  // Total AC energy flowing from the charging station
+  optional float ac_energy = 10;
+  // Total DC energy flowing to the battery
+  optional float dc_energy = 11;
+
+  // Mean power during charging
+  optional float pac_avg = 24;
+  // Max power during charging
+  optional float pac_max = 25;
+
+  // Latitude the vehicle was charging at
+  optional float lat = 30;
+  // Longitude the vehicle was charging at
+  optional float lon = 31;
+}
+
+// Driving statistics sent after completing a driving session.
+//
+// Published to topic `A/<box id>`.
+//
+// This message is guaranteed to be backwards-compatible with
+// `sts.v1.DriveStatistic`.
+message DriveStatistics {
+  reserved 8, 9, 22 to 24, 40 to 44, 50, 51, 53, 55, 56, 60 to 65, 71, 83, 84, 100 to 113, 144 to 146, 152;
+
+  // Vehicle identification number
+  string vin = 1;
+
+  // Unix time the drive started at
+  uint32 timestamp_start = 2;
+  // Unix time the drive ended at
+  uint32 timestamp_end = 3;
+
+  // Kilometer reading at the start of the drive
+  float km_start = 4;
+  // Kilometer reading at the end of the drive
+  float km_end = 5;
+
+  // State of charge at the start of the drive
+  float soc_percent_start = 6;
+  // State of charge at the end of the drive
+  float soc_percent_end = 7;
+
+  // Amount of times the ignition was turned on
+  optional uint32 ignition_count = 20;
+  // Total duration in seconds the ignition was turned on for
+  optional float ignition_time = 21;
+
+  /// Amount of times the vehicle stopped for a delivery
+  optional uint32 delivery_stops = 25;
+
+  // Total driving time in seconds
+  optional float driving_time = 30;
+  // Time in seconds spent in drive mode D
+  optional float drivemode_d_time = 31;
+  // Time in seconds spent in drive mode N
+  optional float drivemode_n_time = 32;
+  // Time in seconds spent in drive mode R
+  optional float drivemode_r_time = 33;
+  // Time in seconds spent in drive mode E
+  optional float drivemode_e_time = 34;
+  // Time in seconds spent in drive mode P
+  optional float drivemode_p_time = 35;
+
+  // Energy used in kWh
+  optional float energy_integrated = 52;
+  // Energy in kWh recuperated
+  optional float recuperated_energy = 54;
+
+  // Amount of times the hand brake was engaged
+  optional uint32 hand_brake_count = 70;
+
+  // Amount of times any of the doors were open
+  optional uint32 door_open_count = 80;
+  // Amount of times the doors were locked
+  optional uint32 door_lock_count = 81;
+
+  // Amount of times the driver seat belt was used
+  optional uint32 belt_use_count = 82;
+
+  // Latitude of the vehicle at the start of the drive
+  optional float lat_start = 140;
+  // Longitude of the vehicle at the start of the drive
+  optional float lon_start = 141;
+  // Latitude of the vehicle at the end of the drive
+  optional float lat_end = 142;
+  // Longitude of the vehicle at the end of the drive
+  optional float lon_end = 143;
+
+  // Max speed in km/h
+  optional float speed_max = 150;
+  // Average speed in km/h when the vehicle was running
+  optional float speed_avg = 151;
+}
+
+
+// edit
